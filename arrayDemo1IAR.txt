@@ -1,0 +1,84 @@
+;Practice Exercise 1
+;Design a subroutine (subAddBytes)to add an array of bytes.  Starting address 
+;wil be received in R5 and length in R6. Result will be stored in R7
+
+;Practice Exercise 2
+;Repeat Exercise 1 for an array of words.  Subroutine name (subAddWords)
+
+;Instructor: José Navarro-Figueroa
+
+
+
+#include "msp430.h"                     ; #define controlled include file
+
+        NAME    main                    ; module name
+
+        PUBLIC  main                    ; make the main label vissible
+
+                                        ; outside this module
+
+         ORG     0FFFEh
+         DC16    init                    ; set reset vector to 'init' label
+year     equ     0x2021        
+         ORG     0x01C00                ; Start of RAM
+byteList db     3,6,9,12,2
+         ALIGN  1
+size     db     5
+threeB   DS     3
+byteSum  db     1
+         ALIGN  1                       ; Erase to see what happens
+wordList dw     0xABCD,0xEF00,0x0099,0x1234
+size2    db     4
+         ALIGN  1 
+wordSum  dw     year
+me       db     "Jose"
+
+        RSEG    CSTACK                  ; pre-declaration of segment
+        RSEG    CODE                    ; place program in 'CODE' segment
+
+init:   MOV     #SFE(CSTACK), SP        ; set up stack
+
+main:   NOP                             ; main program
+        MOV.W   #WDTPW+WDTHOLD,&WDTCTL  ; Stop watchdog timer
+
+        mov.w   #byteList,R5
+        mov.b   size,R6
+        call    #subAddBytes
+        mov.b   R7,byteSum
+
+        mov     #wordList,R5
+        mov.b   size2,R6
+        call    #subAddWords
+        mov     R7,wordSum
+                
+        jmp     fin
+
+subAddBytes:
+        push    R5
+        push    R6
+        mov     #0,R7                   ; R7 stores sum
+addAgain:
+        add.b   0(R5),R7
+        inc     R5
+        dec     R6
+        jnz     addAgain
+        pop     R6
+        pop     R5
+        ret
+        
+subAddWords:
+        push    R5
+        push    R6
+        mov     #0,R7                   ; R7 stores sum
+nextAdd:
+        add.w   0(R5),R7
+        incd.w  R5
+        decd.w  R6
+        jnz     addAgain
+        pop     R6
+        pop     R5
+        ret
+
+fin:    JMP $                           ; jump to current location '$'
+                                        ; (endless loop)
+        END
