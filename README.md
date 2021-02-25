@@ -1,2 +1,2 @@
-#Calculator for the CIIC4082 course.
+Calculator for the CIIC4082 course.
 Team 18
