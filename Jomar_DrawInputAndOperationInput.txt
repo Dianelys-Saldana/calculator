@@ -109,13 +109,13 @@ nextDigitSetup:
 Operate:
         Mov     #0,R10
         cmp     #0,R4
-        jeq     sum
+        ;jeq     sum
         cmp     #1,R4
-        jeq     substraction
+        ;jeq     substraction
         cmp     #2,R4
-        jeq     mult
+        ;jeq     mult
         cmp     #3,R4
-        jeq     divi
+        ;jeq     divi
   
         
 StartDisplay:
