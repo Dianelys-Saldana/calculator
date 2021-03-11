@@ -81,6 +81,7 @@ nextDigitSetup:
         mov.b   #9,R14
         mov.b   #0,R9
         mov.b   #0,R15
+        Mov     #0,R10
         
  Mainloop:
         //mov.b   &P1IN,R5                ; Copy into R5 P1IN's byte
@@ -92,14 +93,30 @@ nextDigitSetup:
         Call    #Delay
         Call #StartDisplay
         ;CALL    #EnterSign
+        Mov     #0,R10
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
         CALL    #EnterInt
-        ;CALL    #Operate
+        CALL    #Operate
         CALL    #ClearLCD
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
+        mov     R10,R5
+        Call    #DrawInt
+        Mov     #0,R10
         ;CALL    #DisplayResult
-        CALL    #Mainloop
+        ;CALL    #Mainloop
+        jmp     fin
         
+Operate:
+        Mov     #0,R10
+        cmp     #0,R4
+        jeq     sum
+        cmp     #1,R4
+        jeq     substraction
+        cmp     #2,R4
+        jeq     mult
+        cmp     #3,R4
+        jeq     divi
+  
         
 StartDisplay:
         Call #DrawDigit1
@@ -127,23 +144,25 @@ EnterInt:
         cmp.b   #00000010B,R13
         jeq     fin
 	jmp     EnterSign
-        
 
         //jmp     fin
         
  termine:
-        Mov     R5,R9
+        Mov     R10,R9
         MOV.W   #0,R5
         CALL    #ClearLCD
         jmp     fin
         
  secondSetup:
+        ;Mov     #0,R10          ;Resets count to set input to 0 when it reaches 10.
+        Call    #SaveInput
         Call    #Delay
         inc     R15
         cmp     #3,R15
         jeq     termine
         Mov.w   #0,R13
-        Call    #setup
+        Mov.w   #0,R5
+        ;Call    #setup
         ;call    #DrawIntSafe
         jmp     EnterInt
         
@@ -205,28 +224,83 @@ strtAgain:
    
 nextDigit:
         ;Call #ClearLCD
-        INC   R5
-        cmp #10,R5
-        jeq EqualTo10
-        call #DrawIntSafe
-        Call #Delay
+        ;INC     R10
+        INC     R5
+        cmp     #10,R5
+        jeq     EqualTo10
+        Call    #SegDraw
+        ;call    #DrawIntSafe
+        Call    #Delay
+        ;Call    #SaveInput
+        Mov     #0,R13
         
         ;sub.w #50,R5
-        cmp #10000,R12
-        jnz EnterInt
+        cmp     #10000,R12
+        jnz     EnterInt
         
-        inc.b R6
-        cmp #7,R6 ;Loop until R6 (Pos) is 7
-        MOV.B #0,R5
-        jnz EnterInt
+        inc.b   R6
+        cmp     #7,R6 ;Loop until R6 (Pos) is 7
+        MOV.B   #0,R5
+        jnz     EnterInt
         
-        jmp TheEnd ;Jump to the end
+        jmp     fin ;Jump to the end
+
+SaveInput:
+        Mov     R5,R13
+        cmp     #0,R15
+        jeq     Save1st
+        cmp     #1,R15
+        jeq     Save2nd
+        cmp     #2,R15
+        jeq     Save3rd
+        
+Save1st:
+        cmp     #0,R13
+        jne     still1
+        ;add     R13,R10
+        jmp     fin
+        
+ still1:
+        add     #100,R10
+        dec     R13
+        jmp     Save1st
+        
+ Save2nd:
+        cmp     #0,R13
+        jne     still2
+        ;add     R13,R10
+        jmp     fin
+        
+ still2:
+        add     #10,R10
+        dec     R13
+        jmp     Save2nd
+        
+ Save3rd:
+        cmp     #0,R13
+        jne     still3
+        ;add     R13,R10
+        jmp     fin
+        
+ still3:
+        add     #1,R10
+        dec     R13
+        jmp     Save3rd
+        
+
+SegDraw:
+        cmp     #0,R15
+        jeq     DrawDigit1
+        cmp     #1,R15
+        jeq     DrawDigit2
+        cmp     #2,R15
+        jeq     DrawDigit3
 
 EqualTo10:
-        mov.b   #0,R5
-        call #DrawIntSafe
-        Call #Delay
-        jmp  EnterInt
+        Mov     #0,R5
+        Call    #SegDraw
+        Call    #Delay
+        jmp     EnterInt
         
 Delay:
         MOV     #50000,R13
