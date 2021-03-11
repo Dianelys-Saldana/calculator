@@ -1,0 +1,435 @@
+;MSP LCD Demo
+
+;Just like we include "msp430.h" I *assume* we can do something like "include "drawutils.s43"" on the main cosa de esta and be able to do it.
+
+#include "msp430.h"                     ; #define controlled include file
+
+        NAME    main                    ; module name
+
+        PUBLIC  main                    ; make the main label vissible
+                                        ; outside this module
+
+         ORG     0FFFEh
+         DC16    init                    ; set reset vector to 'init' label
+         
+         ORG     01C00h                ; Start of RAM
+         
+;Digits      0    1     2     3     4     5     6     7     8     9      +     -     *     /
+DigitH   db 0xFC, 0x60, 0xDB, 0xF3, 0x67, 0xB7, 0xBF, 0xE0, 0xFF, 0xE7, 0x03, 0x03, 0x00, 0x00
+DigitL   db 0x28, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0xFA, 0x28
+
+LCDADD   db     0xa29, 0xa25, 0xa23, 0xA32, 0xA2E, 0xA27
+;LCDADDL db     0xa2a, 0xa26, 0xa24, 0xA33, 0xA2F, 0xA28
+
+         RSEG    CSTACK                  ; pre-declaration of segment
+         RSEG    CODE                    ; place program in 'CODE' segment
+
+init:    MOV     #SFE(CSTACK), SP        ; set up stack
+
+main:   NOP                             ; main program
+        MOV.W   #WDTPW+WDTHOLD,&WDTCTL  ; Stop watchdog timer
+
+      ;Enable LCD Segments 0-21; 26-43
+
+        MOV.W   #0xffff,&LCDCPCTL0
+        MOV.W   #0xfc3f,&LCDCPCTL1
+        MOV.W   #0x0fff,&LCDCPCTL2
+        
+        
+SetupP1:
+        bic.b   #0xFF,&P1SEL0           ; Set PxSel0 and PxSel1 to digital I/O
+        bic.b   #0xFF,&P1SEL1           ; Digital I/O is the default
+        bic.b   #0xFF,&P9SEL0
+        bic.b   #0xFF,&P9SEL1
+        
+        mov.b   #11111001B,&P1DIR       ; Set P1.1 and P1.2 for input and all
+                                        ; other P1 pins for outpuu
+        bis.b   #0xFF,&P9DIR            ; Set all P9 pins for output
+
+        mov.b   #00000110B,&P1REN       ; Activate P1.1 and P1.2 programable
+                                        ; pull-up/pull-down resistors
+        bis.b   #00000110B,&P1OUT       ; Set resistors for P1.1 and P1.2 as
+                                        ; as pull-down
+        bic.b   #0x01,&P1OUT            ; Clear P1.0 and P9.7 output latch to
+        bic.b   #0x80,&P9OUT            ; start with both off
+        
+UnlockGPIO:                             ; Disable de GPIO power-on default
+        bic.w #LOCKLPM5, &PM5CTL0       ; High-impedance mode to acivade
+                                        ; previously configured port settings
+        ;Initialize LCD_C
+        MOV.W   #0x041e,&LCDCCTL0
+
+        ;VLCD generated internally,
+        ;V2-V4 Generated internally, v5 to ground.
+        ;set VLCD Voltaeg to 2.6V
+        ;Enable Charge pump and select internal reference for it.
+
+        MOV.W   #0x0208,&LCDCVCTL
+
+        MOV.W   #0x8000,&LCDCCPCTL     ;Clock sync Enabled
+        
+        call #ClearLCD          ;Clear LCD Memory
+
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+        MOV.B #1,R6 ;Points to first digit spot.
+        MOV.W #0,R5
+        mov.b #0,R7
+        
+nextDigitSetup:
+        ;Setting up stuff for nextDigit
+        mov.b   #9,R14
+        mov.b   #0,R9
+        mov.b   #0,R15
+        
+ Mainloop:
+        //mov.b   &P1IN,R5                ; Copy into R5 P1IN's byte
+        Call #StartDisplay
+        ;call #DrawIntSafe
+        CALL    #EnterInt
+        mov     R9,R8
+        Call    #nextSign
+        Call    #Delay
+        Call #StartDisplay
+        ;CALL    #EnterSign
+        mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
+        CALL    #EnterInt
+        ;CALL    #Operate
+        CALL    #ClearLCD
+        mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
+        ;CALL    #DisplayResult
+        CALL    #Mainloop
+        
+        
+StartDisplay:
+        Call #DrawDigit1
+        Call #DrawDigit2
+        Call #DrawDigit3
+        jmp  fin
+        
+EnterInt:
+        ;call #DrawIntSafe
+        mov.b   &P1IN,R13 
+	and.b   #00000110B,R13
+        cmp.b   #00000100B,R13
+        jeq     nextDigit
+        cmp.b   #00000010B,R13
+        jeq     secondSetup
+	jmp EnterInt
+        
+        
+ EnterSign:
+        ;call #DrawIntSafe
+        mov.b   &P1IN,R13 
+	and.b   #00000110B,R13
+        cmp.b   #00000100B,R13
+        jeq     nextSign
+        cmp.b   #00000010B,R13
+        jeq     fin
+	jmp     EnterSign
+        
+
+        //jmp     fin
+        
+ termine:
+        Mov     R5,R9
+        MOV.W   #0,R5
+        CALL    #ClearLCD
+        jmp     fin
+        
+ secondSetup:
+        Call    #Delay
+        inc     R15
+        cmp     #3,R15
+        jeq     termine
+        Mov.w   #0,R13
+        Call    #setup
+        ;call    #DrawIntSafe
+        jmp     EnterInt
+        
+ setup:
+        cmp     #0,R5
+        jne     still
+        Mov.w   R13,R5
+        jmp     fin
+        
+ still:
+        add     #10,R13
+        dec     R5
+        jmp     setup
+        
+ secSegment:
+        mov.b   &P1IN,R13 
+	and.b   #00000110B,R13
+        cmp.b   #00000100B,R13
+        jeq     secNextDigit
+        cmp.b   #00000010B,R13
+        jeq     secondSetup
+	jmp secSegment
+        
+ secNextDigit:
+        ;Call #ClearLCD
+        INC   R5
+        cmp #10,R5
+        jeq EqualTo10
+        call #DrawIntSafe
+        Call #Delay
+        
+        ;sub.w #50,R5
+        cmp #10000,R12
+        jnz secSegment
+        
+        inc.b R6
+        cmp #7,R6 ;Loop until R6 (Pos) is 7
+        MOV.B #0,R5
+        jnz secSegment
+        
+        jmp TheEnd ;Jump to the end
+        
+        
+ nextSign:
+        Call    #Delay
+        cmp     #4,R7
+        jge     strtAgain                       ;Starts the sign cycle again after it is >=4
+        call    #ClearLCD
+        call    #DrawSign
+        Mov     R7,R4                           ;Saves operation identifier on R4
+        inc.b   R7
+        jmp     EnterSign
+        
+strtAgain:
+        mov.b   #0,R7
+        jmp     nextSign
+        
+   
+   
+nextDigit:
+        ;Call #ClearLCD
+        INC   R5
+        cmp #10,R5
+        jeq EqualTo10
+        call #DrawIntSafe
+        Call #Delay
+        
+        ;sub.w #50,R5
+        cmp #10000,R12
+        jnz EnterInt
+        
+        inc.b R6
+        cmp #7,R6 ;Loop until R6 (Pos) is 7
+        MOV.B #0,R5
+        jnz EnterInt
+        
+        jmp TheEnd ;Jump to the end
+
+EqualTo10:
+        mov.b   #0,R5
+        call #DrawIntSafe
+        Call #Delay
+        jmp  EnterInt
+        
+Delay:
+        MOV     #50000,R13
+        
+Next:
+        dec     R13
+        jnz     Next
+        jmp     fin
+        
+DrawSign:
+    push.w R7 ;Save R7
+    push.w R5 ;Save R5
+    add #10,R7 ;Add 10 so 0->10, 1->11, 2->12 etc.
+    mov.b R7,R5 ;Move R7 to R5 so that we can draw R7
+    call #DrawDigit ;Take us straight to the part of Drawint where we decide where to draw R5 which should be a digit but if it isn't it goes further in the array to find the signs.
+    pop.w R5 ;Return R5
+    pop.w R7 ;Return R7
+    ret ;And let's get the hell out of here.
+    
+
+;Draws Int in R5 starting at position R6
+DrawIntSafe:
+DrawInt:
+    push.w R6
+    push.w R11
+    push.w R5
+    
+    ;CHECK IF NEGATIVE AND IF NEGATIVE FLIP
+    cmp.w R5,0
+    jlo DrawIntFlipR5
+    DrawIntFlipR5Cont:    
+    
+    call #DrawIntDirect
+    pop.w R5
+    pop.w R11
+    pop.w R6
+    
+    ;CHECK IF NEGATIVE AGAIN AND IF NEGATIVE DRAW NEGATIVE SIGN.
+    cmp.w R5,0
+    jlo DrawIntDrawNegative ;no need for a cont tag since we can use the return in DrawIntDrawNegative to return.
+    ret
+
+DrawIntFlipR5:
+  inv R5
+  inc.w R5
+  jmp DrawIntFlipR5Cont
+  
+DrawIntDrawNegative:
+  BIS.B #0x04,&0xA2A ;Draw Negative
+  ret ;return
+
+;Draws an unsigned (assume positive) integer WITHOUT ensuring that R5, R6, and R11 are preserved.
+DrawIntDirect:
+      
+      cmp.w #7,R6
+      jge DrawIntOver10000 ;If R6 is over 6 (IE >=7) then oops that's beyond the screen RETURN
+      
+      cmp.w #10000,R5
+      jge DrawIntOver10000 ;If it's over 10,000 return we aren't drawing that
+
+      mov.b #0,R11 ;reset R11 becuase we're going to use it to *count*
+
+      cmp.w #1000,R5
+      jge DrawIntOver1000 ;If it's over 1000
+
+      cmp.w #100,R5
+      jge DrawIntOver100 ;If it's over 100
+
+      cmp.w #10,R5
+      jge DrawIntOver10 ;If it's over 10
+DrawDigit:
+
+      ;Draw the specific digit
+      cmp.b #6,R6
+      jeq DrawDigit6
+      
+      cmp.b #5,R6
+      jeq DrawDigit5
+      
+      cmp.b #4,R6
+      jeq DrawDigit4
+      
+      cmp.b #3,R6
+      jeq DrawDigit3
+      
+      cmp.b #2,R6
+      jeq DrawDigit2
+      
+      cmp.b #1,R6
+      jeq DrawDigit1
+
+      ret
+
+;DrawIntSetNegative:
+ ;      jmp DrawIntSetNegativeCont
+
+DrawDigit1:
+      MOV.B #9,R11 ;Reuse R11 because why not
+      MOV.B DigitH(R5),0xA20(R11)
+      MOV.B DigitL(R5),0xA20+1(R11)
+ret
+
+DrawDigit2:
+      MOV.B #5,R11
+      MOV.B DigitH(R5),0xA20(R11)
+      MOV.B DigitL(R5),0xA20+1(R11)
+ret
+
+DrawDigit3:
+      MOV.B #3,R11
+      MOV.B DigitH(R5),0xA20(R11)
+      MOV.B DigitL(R5),0xA20+1(R11)
+ret
+
+DrawDigit4:
+      MOV.B #2,R11
+      MOV.B DigitH(R5),0xA30(R11)
+      MOV.B DigitL(R5),0xA30+1(R11)
+ret
+
+DrawDigit5:
+      MOV.B #14,R11
+      MOV.B DigitH(R5),0xA20(R11)
+      MOV.B DigitL(R5),0xA20+1(R11)
+ret
+
+DrawDigit6:
+      MOV.B #7,R11
+      MOV.B DigitH(R5),0xA20(R11)
+      MOV.B DigitL(R5),0xA20+1(R11)
+ret
+
+;;;;;;;;;;DRAWINT SUBROUTINES;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+DrawIntOver10000:
+      ret ;Return because we won't need to do that. ahahahaha
+
+DrawIntOver1000:
+      sub.w #1000,R5 ;Subtract and 
+      inc.b R11    ;keep track of how many times subtracted 1000 
+      cmp #1000,R5
+      jge DrawIntOver1000  ;until its no longer >=1000
+
+     ;Draw and reset R11
+      call #DrawIntDrawR11
+      
+      inc.b R6 ;Increment R6
+
+      jmp DrawIntOver100;Continue on to DrawIntOver100
+
+DrawIntOver100:
+      
+      cmp #100,R5
+      jlo DrawIntOver100Already  ;Check if it's bellow 100. Otherwise, 
+      
+      sub.w #100,R5 ;Subtract and 
+      inc.b R11    ;keep track of how many times subtracted 100
+      jmp DrawIntOver100  ;until its no longer >=100
+      
+      DrawIntOver100Already:
+      
+      ;Draw and reset R11
+      call #DrawIntDrawR11
+      inc.b R6 ;Increment R6      
+
+      jmp DrawIntOver10 ;Continue on to DrawIntOver10
+      
+DrawIntOver10:
+      cmp #10,R5
+      jlo DrawIntOver10Already  ;Check if we're already under 10. Otherwise...
+
+      sub.w #10,R5 ;Subtract and 
+      inc.b R11    ;keep track of how many times subtracted 1000 
+      jmp DrawIntOver10  ;until its no longer >=10
+
+      DrawIntOver10Already:
+
+      ;Draw and reset
+      call #DrawIntDrawR11
+      inc.b R6 ;Increment R6      
+      
+      ;Jump to DrawDigit. It has a return so we'll return once we draw the last digit
+      jmp DrawDigit
+
+
+DrawIntDrawR11:
+      push.w R5 ;Save R5
+      mov.w R11,R5 ;Move R11 to R5
+      call #DrawDigit ;Draw R11 (now in R5)
+      pop.w R5 ;Return R5
+      mov.b #0,R11 ;Reset R11 for the next subroutine.
+      ret
+
+
+
+;Clears the LCD, then returns
+ClearLCD:
+        MOV.W   #2,&LCDCMEMCTL
+        BIS.W   #1,&LCDCCTL0
+        ret
+        
+fin:    RET
+        
+TheEnd: JMP $                           ; jump to current location '$'
+                                        ; (endless loop)
+        END
