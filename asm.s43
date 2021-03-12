@@ -150,8 +150,25 @@ mult:
         add     R8,R10
         jmp     mult
         
-divi:
+testdivi:
+        cmp     #0,R8
+        jeq     equalToZero
+        cmp     #0,R9
+        jeq     equalToZero
+        div     R8,R9
+        mov     R9,R10
         jmp     fin
+        
+        
+divi:     cmp   #0,R9
+          jeq   fin
+          cmp   #0,R8
+          jeq   fin
+          sub   R8,R9
+          jn    fin
+          add   #1,R10
+          jmp   divi
+          
         
         
 StartDisplay:
