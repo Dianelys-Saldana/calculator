@@ -81,104 +81,34 @@ nextDigitSetup:
         mov.b   #9,R14
         mov.b   #0,R9
         mov.b   #0,R15
-        Mov     #0,R10
+        mov     #0,R10
         
  Mainloop:
-        //mov.b   &P1IN,R5                ; Copy into R5 P1IN's byte
-        Call #StartDisplay
-        ;call #DrawIntSafe
-        CALL    #EnterInt
+        Call    #StartDisplay
+        Call    #EnterInt
         mov     R9,R8
         Call    #nextSign
         Call    #Delay
-        Call #StartDisplay
-        ;CALL    #EnterSign
-        Mov     #0,R10
+        Call    #StartDisplay
+        mov     #0,R10
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
-        CALL    #EnterInt
-        CALL    #Operate
-        CALL    #ClearLCD
+        Call    #EnterInt
+        Call    #Operate
+        Call    #ClearLCD
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
         mov     R10,R5
         Call    #DrawInt
-        Mov     #0,R10
-        ;CALL    #DisplayResult
-        ;CALL    #Mainloop
-        jmp     fin
-        
-Operate:
-        Mov     #0,R10
-        cmp     #0,R4
-        jeq     sum
-        cmp     #1,R4
-        jeq     substraction
-        cmp     #2,R4
-        jeq     mult
-        cmp     #3,R4
-        jeq     divi
-        
-sum:
-        add     R8,R9
-        Mov     R9,R10
-        jmp fin
-        
-substraction:
-        cmp     R8,R9
-        jeq     equalToZero
-        cmp     R8,R9
-        jge      swap
-        sub     R9,R8
-        Mov     R8,R10
-        jmp     fin
-        
-equalToZero:
-        Mov     #0,R10
-        jmp     fin
-        
-swap:
-        Mov     R9,R10
-        Mov     R8,R9
-        Mov     R10,R8
-        jmp     substraction
-        
-mult:
-        cmp     #0,R9
-        jeq     fin
-        cmp     #0,R8
-        jeq     fin
-        dec     R9
-        add     R8,R10
-        jmp     mult
-        
-testdivi:
-        cmp     #0,R8
-        jeq     equalToZero
-        cmp     #0,R9
-        jeq     equalToZero
-        div     R8,R9
-        mov     R9,R10
-        jmp     fin
-        
-        
-divi:     cmp   #0,R9
-          jeq   fin
-          cmp   #0,R8
-          jeq   fin
-          sub   R8,R9
-          jn    fin
-          add   #1,R10
-          jmp   divi
-          
+        mov     #0,R10
+        Call    #HoldResult
+        jmp     Mainloop
         
         
 StartDisplay:
         Call #DrawDigit1
-        Call #DrawDigit2
-        Call #DrawDigit3
         jmp  fin
         
+        
 EnterInt:
-        ;call #DrawIntSafe
         mov.b   &P1IN,R13 
 	and.b   #00000110B,R13
         cmp.b   #00000100B,R13
@@ -188,26 +118,35 @@ EnterInt:
 	jmp EnterInt
         
         
- EnterSign:
-        ;call #DrawIntSafe
-        mov.b   &P1IN,R13 
-	and.b   #00000110B,R13
-        cmp.b   #00000100B,R13
-        jeq     nextSign
-        cmp.b   #00000010B,R13
-        jeq     fin
-	jmp     EnterSign
-
-        //jmp     fin
         
- termine:
-        Mov     R10,R9
-        MOV.W   #0,R5
-        CALL    #ClearLCD
+nextDigit:
+
+        INC     R5
+        cmp     #10,R5
+        jeq     EqualTo10
+        Call    #SegDraw
+
+        Call    #Delay
+        Mov     #0,R13
+        cmp     #10000,R12
+        jnz     EnterInt
+        
+        inc.b   R6
+        cmp     #7,R6             ;Loop until R6 (Pos) is 7
+        MOV.B   #0,R5
+        jnz     EnterInt
+        
         jmp     fin
         
+        
+ EqualTo10:
+        Mov     #0,R5
+        Call    #SegDraw
+        Call    #Delay
+        jmp     EnterInt
+
+
  secondSetup:
-        ;Mov     #0,R10          ;Resets count to set input to 0 when it reaches 10.
         Call    #SaveInput
         Call    #Delay
         inc     R15
@@ -215,89 +154,26 @@ EnterInt:
         jeq     termine
         Mov.w   #0,R13
         Mov.w   #0,R5
-        ;Call    #setup
-        ;call    #DrawIntSafe
+        Call    #SegDraw
         jmp     EnterInt
         
- setup:
-        cmp     #0,R5
-        jne     still
-        Mov.w   R13,R5
+        
+termine:
+        Mov     R10,R9
+        MOV.W   #0,R5
+        CALL    #ClearLCD
         jmp     fin
         
- still:
-        add     #10,R13
-        dec     R5
-        jmp     setup
         
- secSegment:
-        mov.b   &P1IN,R13 
-	and.b   #00000110B,R13
-        cmp.b   #00000100B,R13
-        jeq     secNextDigit
-        cmp.b   #00000010B,R13
-        jeq     secondSetup
-	jmp secSegment
-        
- secNextDigit:
-        ;Call #ClearLCD
-        INC   R5
-        cmp #10,R5
-        jeq EqualTo10
-        call #DrawIntSafe
-        Call #Delay
-        
-        ;sub.w #50,R5
-        cmp #10000,R12
-        jnz secSegment
-        
-        inc.b R6
-        cmp #7,R6 ;Loop until R6 (Pos) is 7
-        MOV.B #0,R5
-        jnz secSegment
-        
-        jmp TheEnd ;Jump to the end
+SegDraw:
+        cmp     #0,R15
+        jeq     DrawDigit1
+        cmp     #1,R15
+        jeq     DrawDigit2
+        cmp     #2,R15
+        jeq     DrawDigit3
         
         
- nextSign:
-        Call    #Delay
-        cmp     #4,R7
-        jge     strtAgain                       ;Starts the sign cycle again after it is >=4
-        call    #ClearLCD
-        call    #DrawSign
-        Mov     R7,R4                           ;Saves operation identifier on R4
-        inc.b   R7
-        jmp     EnterSign
-        
-strtAgain:
-        mov.b   #0,R7
-        jmp     nextSign
-        
-   
-   
-nextDigit:
-        ;Call #ClearLCD
-        ;INC     R10
-        INC     R5
-        cmp     #10,R5
-        jeq     EqualTo10
-        Call    #SegDraw
-        ;call    #DrawIntSafe
-        Call    #Delay
-        ;Call    #SaveInput
-        Mov     #0,R13
-        
-        ;sub.w #50,R5
-        cmp     #10000,R12
-        jnz     EnterInt
-        
-        inc.b   R6
-        cmp     #7,R6 ;Loop until R6 (Pos) is 7
-        MOV.B   #0,R5
-        jnz     EnterInt
-        
-        jmp     fin ;Jump to the end
-
 SaveInput:
         Mov     R5,R13
         cmp     #0,R15
@@ -340,20 +216,121 @@ Save1st:
         dec     R13
         jmp     Save3rd
         
-
-SegDraw:
-        cmp     #0,R15
-        jeq     DrawDigit1
-        cmp     #1,R15
-        jeq     DrawDigit2
-        cmp     #2,R15
-        jeq     DrawDigit3
-
-EqualTo10:
-        Mov     #0,R5
-        Call    #SegDraw
+        
+EnterSign:
+        mov.b   &P1IN,R13 
+	and.b   #00000110B,R13
+        cmp.b   #00000100B,R13
+        jeq     nextSign
+        cmp.b   #00000010B,R13
+        jeq     fin
+	jmp     EnterSign
+        
+        
+ nextSign:
         Call    #Delay
-        jmp     EnterInt
+        cmp     #4,R7
+        jge     strtAgain                       ;Starts the sign cycle again after it is >=4
+        call    #ClearLCD
+        call    #DrawSign
+        Mov     R7,R4                           ;Saves operation identifier on R4
+        inc.b   R7
+        jmp     EnterSign
+        
+        
+strtAgain:
+        mov.b   #0,R7
+        jmp     nextSign
+        
+        
+Operate:
+        Mov     #0,R10
+        cmp     #0,R4
+        jeq     sum
+        cmp     #1,R4
+        jeq     substraction
+        cmp     #2,R4
+        jeq     mult
+        cmp     #3,R4
+        jeq     divi
+        
+        
+sum:
+        add     R8,R9
+        Mov     R9,R10
+        jmp fin
+        
+        
+substraction:
+        cmp     R8,R9
+        jeq     equalToZero
+        cmp     R8,R9
+        jge      swap
+        sub     R9,R8
+        Mov     R8,R10
+        jmp     fin
+        
+        
+equalToZero:
+        Mov     #0,R10
+        jmp     fin
+        
+        
+swap:
+        Mov     R9,R10
+        Mov     R8,R9
+        Mov     R10,R8
+        jmp     substraction
+        
+        
+mult:
+        cmp     #0,R9
+        jeq     fin
+        cmp     #0,R8
+        jeq     fin
+        dec     R9
+        add     R8,R10
+        jmp     mult
+          
+        
+divi:     cmp   #0,R9
+          jeq   fin
+          cmp   #0,R8
+          jeq   fin
+          sub   R9,R8
+          jn    fin
+          add   #1,R10
+          jmp   divi
+        
+        
+HoldResult:
+        mov.b   &P1IN,R13 
+	and.b   #00000110B,R13
+        cmp.b   #00000010B,R13
+        jeq     ClearReg         ;When right clicked resets everything for next operation
+	jmp     HoldResult
+        
+ClearReg:       ;Clears register for next run
+        Call    #Delay
+        
+        mov     #0,R4
+        mov     #0,R5
+        
+        mov     #1,R6           ;Tells us which segment we will use and we always at the very least use the 1st
+
+        mov     #0,R7
+        mov     #0,R8
+        mov     #0,R9
+        mov     #0,R10
+        mov     #0,R11
+        mov     #0,R12
+        mov     #0,R13
+        mov     #0,R14
+        mov     #0,R15
+        Call    #ClearLCD
+        
+        jmp     fin
+              
         
 Delay:
         MOV     #50000,R13
