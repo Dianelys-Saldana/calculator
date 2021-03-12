@@ -169,7 +169,30 @@ divi:     cmp   #0,R9
           add   #1,R10
           jmp   divi
           
-        
+
+;;;;;;;;;;;;; 
+
+multiply:
+	mov #0, R10   
+	cmp R8, R9
+	jn greaterThanSecond
+	jump greaterThanFirst
+
+greaterThanSecond:
+	cmp #0, R9
+	jeq fin
+	add R8, R10
+	dec R9
+	jmp greaterThanSecond
+
+greaterThanFirst:
+	cmp #0, R8
+	jeq fin
+	add R9, R10
+	dec R8
+	jmp greaterThanFirst
+
+;;;;;;;;;;;;;
         
 StartDisplay:
         Call #DrawDigit1
