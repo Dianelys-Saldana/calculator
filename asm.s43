@@ -84,6 +84,7 @@ nextDigitSetup:
         mov     #0,R10
         
  Mainloop:
+        Call    #ClearReg
         Call    #StartDisplay
         Call    #EnterInt
         mov     R9,R8
@@ -97,11 +98,107 @@ nextDigitSetup:
         Call    #ClearLCD
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
         mov     R10,R5
-        Call    #DrawInt
+        Call    #DrawResult
         Call    #isNegative
         mov     #0,R10
         Call    #HoldResult
         jmp     Mainloop
+        
+
+DrawResult:
+        Mov     #1,R6
+        Mov     #0,R8
+        cmp     #0,R12
+        jeq     DrawInt
+        Call    #Drawing100
+        Call    #Drawing10
+        Call    #Drawing1
+        Mov     R10,R12
+        Call    #Drawing100
+        Call    #Drawing10
+        Call    #Drawing1
+        jmp     fin
+        
+    
+Drawing100:
+        cmp     #2,R6
+        jge     DrawSecSeg100
+        cmp     #100,R12
+        jge     reduce100
+        jmp     fin
+        
+        
+DrawSecSeg100:
+        cmp     #100,R12
+        jge     reduce100
+        Mov     R8,R5
+        Call    #DrawIntDirect
+        Inc     R6
+        Mov     #0,R8
+        jmp     fin
+        
+        
+Drawing10:
+        cmp     #10,R12
+        jge     reduce10
+        cmp     #2,R6
+        jge     Draw10
+        jmp     fin
+        
+    
+Drawing1:
+        cmp     #1,R12
+        jge     reduce1
+        cmp     #2,R6
+        jge     Draw1
+        jmp     fin
+        
+        
+reduce100:
+        Inc     R8
+        sub     #100,R12
+        cmp     #100,R12
+        jlo     Draw100
+        jmp     reduce100
+        
+Draw100:
+        Mov     R8,R5
+        Call    #DrawIntDirect
+        Inc     R6
+        Mov     #0,R8
+        jmp     fin
+
+
+reduce10:
+        Inc     R8
+        sub     #10,R12
+        cmp     #10,R12
+        jlo     Draw10
+        jmp     reduce10
+        
+        
+Draw10:
+        Mov     R8,R5
+        Call    #DrawIntDirect
+        Inc     R6
+        Mov     #0,R8
+        jmp     fin
+
+
+reduce1:
+        Inc     R8
+        sub     #1,R12
+        cmp     #1,R12
+        jlo     Draw1
+        jmp     reduce1
+        
+        
+Draw1:
+        Mov     R8,R5
+        Call    #DrawIntDirect
+        Inc     R6
+        Mov     #0,R8
+        jmp     fin
         
         
 isNegative:
@@ -257,6 +354,7 @@ strtAgain:
         
 Operate:
         Mov     #0,R10
+        Mov     #0,R12
         cmp     #0,R4
         jeq     sum
         cmp     #1,R4
@@ -270,14 +368,14 @@ Operate:
 sum:
         add     R8,R9
         Mov     R9,R10
-        jmp fin
+        jmp     fin
         
         
 substraction:
         cmp     R8,R9
         jeq     equalToZero
         cmp     R8,R9
-        jge      swap
+        jge     swap
         sub     R9,R8
         Mov     R8,R10
         Mov     #0,R8
@@ -300,6 +398,8 @@ swap:
         
         
 mult:
+        cmp     #1000,R10
+        jge     nextRegister
         cmp     #0,R9
         jeq     fin
         cmp     #0,R8
@@ -307,16 +407,29 @@ mult:
         dec     R9
         add     R8,R10
         jmp     mult
+        
+
+MoveValues:
+        Inc     R12
+        sub     #1000,R10
+        jmp     mult
+        
+        
+nextRegister:
+        Inc     R12
+        sub     #1000,R10
+        jmp     mult
           
         
-divi:     cmp   #0,R9
-          jeq   fin
-          cmp   #0,R8
-          jeq   fin
-          sub   R9,R8
-          jn    fin
-          add   #1,R10
-          jmp   divi
+divi:     
+        cmp   #0,R9
+        jeq   fin
+        cmp   #0,R8
+        jeq   fin
+        sub   R9,R8
+        jn    fin
+        add   #1,R10
+        jmp   divi
         
         
 HoldResult:
@@ -357,86 +470,86 @@ Next:
         jmp     fin
         
 DrawSign:
-    push.w R7 ;Save R7
-    push.w R5 ;Save R5
-    add #10,R7 ;Add 10 so 0->10, 1->11, 2->12 etc.
-    mov.b R7,R5 ;Move R7 to R5 so that we can draw R7
-    call #DrawDigit ;Take us straight to the part of Drawint where we decide where to draw R5 which should be a digit but if it isn't it goes further in the array to find the signs.
-    pop.w R5 ;Return R5
-    pop.w R7 ;Return R7
-    ret ;And let's get the hell out of here.
+        push.w  R7 ;Save R7
+        push.w  R5 ;Save R5
+        add     #10,R7 ;Add 10 so 0->10, 1->11, 2->12 etc.
+        mov.b   R7,R5 ;Move R7 to R5 so that we can draw R7
+        call    #DrawDigit ;Take us straight to the part of Drawint where we decide where to draw R5 which should be a digit but if it isn't it goes further in the array to find the signs.
+        pop.w   R5 ;Return R5
+        pop.w   R7 ;Return R7
+        ret ;And let's get the hell out of here.
     
 
 ;Draws Int in R5 starting at position R6
 DrawIntSafe:
 DrawInt:
-    push.w R6
-    push.w R11
-    push.w R5
+       push.w   R6
+       push.w   R11
+       push.w   R5
     
     ;CHECK IF NEGATIVE AND IF NEGATIVE FLIP
-    cmp.w R5,0
-    jlo DrawIntFlipR5
-    DrawIntFlipR5Cont:    
+      cmp.w     R5,0
+      jlo       DrawIntFlipR5
+DrawIntFlipR5Cont:    
     
-    call #DrawIntDirect
-    pop.w R5
-    pop.w R11
-    pop.w R6
+      call      #DrawIntDirect
+      pop.w     R5
+      pop.w     R11
+      pop.w     R6
     
     ;CHECK IF NEGATIVE AGAIN AND IF NEGATIVE DRAW NEGATIVE SIGN.
-    cmp.w R5,0
-    jlo DrawIntDrawNegative ;no need for a cont tag since we can use the return in DrawIntDrawNegative to return.
-    ret
+      cmp.w     R5,0
+      jlo       DrawIntDrawNegative ;no need for a cont tag since we can use the return in DrawIntDrawNegative to return.
+      ret
 
 DrawIntFlipR5:
-  inv R5
-  inc.w R5
-  jmp DrawIntFlipR5Cont
+      inv       R5
+      inc.w     R5
+      jmp       DrawIntFlipR5Cont
   
 DrawIntDrawNegative:
-  BIS.B #0x04,&0xA2A ;Draw Negative
-  ret ;return
+      BIS.B     #0x04,&0xA2A ;Draw Negative
+      ret ;return
 
 ;Draws an unsigned (assume positive) integer WITHOUT ensuring that R5, R6, and R11 are preserved.
 DrawIntDirect:
       
-      cmp.w #7,R6
-      jge DrawIntOver10000 ;If R6 is over 6 (IE >=7) then oops that's beyond the screen RETURN
+      cmp.w     #7,R6
+      jge       DrawIntOver10000 ;If R6 is over 6 (IE >=7) then oops that's beyond the screen RETURN
       
-      cmp.w #10000,R5
-      jge DrawIntOver10000 ;If it's over 10,000 return we aren't drawing that
+      cmp.w     #10000,R5
+      jge       DrawIntOver10000 ;If it's over 10,000 return we aren't drawing that
 
-      mov.b #0,R11 ;reset R11 becuase we're going to use it to *count*
+      mov.b     #0,R11 ;reset R11 becuase we're going to use it to *count*
 
-      cmp.w #1000,R5
-      jge DrawIntOver1000 ;If it's over 1000
+      cmp.w     #1000,R5
+      jge       DrawIntOver1000 ;If it's over 1000
 
-      cmp.w #100,R5
-      jge DrawIntOver100 ;If it's over 100
+      cmp.w     #100,R5
+      jge       DrawIntOver100 ;If it's over 100
 
-      cmp.w #10,R5
-      jge DrawIntOver10 ;If it's over 10
+      cmp.w     #10,R5
+      jge       DrawIntOver10 ;If it's over 10
 DrawDigit:
 
       ;Draw the specific digit
-      cmp.b #6,R6
-      jeq DrawDigit6
+      cmp.b     #6,R6
+      jeq       DrawDigit6
       
-      cmp.b #5,R6
-      jeq DrawDigit5
+      cmp.b     #5,R6
+      jeq       DrawDigit5
       
-      cmp.b #4,R6
-      jeq DrawDigit4
+      cmp.b     #4,R6
+      jeq       DrawDigit4
       
-      cmp.b #3,R6
-      jeq DrawDigit3
+      cmp.b     #3,R6
+      jeq       DrawDigit3
       
-      cmp.b #2,R6
-      jeq DrawDigit2
+      cmp.b     #2,R6
+      jeq       DrawDigit2
       
-      cmp.b #1,R6
-      jeq DrawDigit1
+      cmp.b     #1,R6
+      jeq       DrawDigit1
 
       ret
 
@@ -444,39 +557,39 @@ DrawDigit:
  ;      jmp DrawIntSetNegativeCont
 
 DrawDigit1:
-      MOV.B #9,R11 ;Reuse R11 because why not
-      MOV.B DigitH(R5),0xA20(R11)
-      MOV.B DigitL(R5),0xA20+1(R11)
+      MOV.B     #9,R11 ;Reuse R11 because why not
+      MOV.B     DigitH(R5),0xA20(R11)
+      MOV.B     DigitL(R5),0xA20+1(R11)
 ret
 
 DrawDigit2:
-      MOV.B #5,R11
-      MOV.B DigitH(R5),0xA20(R11)
-      MOV.B DigitL(R5),0xA20+1(R11)
+      MOV.B     #5,R11
+      MOV.B     DigitH(R5),0xA20(R11)
+      MOV.B     DigitL(R5),0xA20+1(R11)
 ret
 
 DrawDigit3:
-      MOV.B #3,R11
-      MOV.B DigitH(R5),0xA20(R11)
-      MOV.B DigitL(R5),0xA20+1(R11)
+      MOV.B     #3,R11
+      MOV.B     DigitH(R5),0xA20(R11)
+      MOV.B     DigitL(R5),0xA20+1(R11)
 ret
 
 DrawDigit4:
-      MOV.B #2,R11
-      MOV.B DigitH(R5),0xA30(R11)
-      MOV.B DigitL(R5),0xA30+1(R11)
+      MOV.B     #2,R11
+      MOV.B     DigitH(R5),0xA30(R11)
+      MOV.B     DigitL(R5),0xA30+1(R11)
 ret
 
 DrawDigit5:
-      MOV.B #14,R11
-      MOV.B DigitH(R5),0xA20(R11)
-      MOV.B DigitL(R5),0xA20+1(R11)
+      MOV.B     #14,R11
+      MOV.B     DigitH(R5),0xA20(R11)
+      MOV.B     DigitL(R5),0xA20+1(R11)
 ret
 
 DrawDigit6:
-      MOV.B #7,R11
-      MOV.B DigitH(R5),0xA20(R11)
-      MOV.B DigitL(R5),0xA20+1(R11)
+      MOV.B     #7,R11
+      MOV.B     DigitH(R5),0xA20(R11)
+      MOV.B     DigitL(R5),0xA20+1(R11)
 ret
 
 ;;;;;;;;;;DRAWINT SUBROUTINES;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -485,68 +598,68 @@ DrawIntOver10000:
       ret ;Return because we won't need to do that. ahahahaha
 
 DrawIntOver1000:
-      sub.w #1000,R5 ;Subtract and 
-      inc.b R11    ;keep track of how many times subtracted 1000 
-      cmp #1000,R5
-      jge DrawIntOver1000  ;until its no longer >=1000
+      sub.w     #1000,R5 ;Subtract and 
+      inc.b     R11    ;keep track of how many times subtracted 1000 
+      cmp       #1000,R5
+      jge       DrawIntOver1000  ;until its no longer >=1000
 
      ;Draw and reset R11
-      call #DrawIntDrawR11
+      call      #DrawIntDrawR11
       
-      inc.b R6 ;Increment R6
+      inc.b     R6 ;Increment R6
 
-      jmp DrawIntOver100;Continue on to DrawIntOver100
+      jmp       DrawIntOver100;Continue on to DrawIntOver100
 
 DrawIntOver100:
       
-      cmp #100,R5
-      jlo DrawIntOver100Already  ;Check if it's bellow 100. Otherwise, 
+      cmp       #100,R5
+      jlo       DrawIntOver100Already  ;Check if it's bellow 100. Otherwise, 
       
-      sub.w #100,R5 ;Subtract and 
-      inc.b R11    ;keep track of how many times subtracted 100
-      jmp DrawIntOver100  ;until its no longer >=100
+      sub.w     #100,R5 ;Subtract and 
+      inc.b     R11    ;keep track of how many times subtracted 100
+      jmp       DrawIntOver100  ;until its no longer >=100
       
       DrawIntOver100Already:
       
       ;Draw and reset R11
-      call #DrawIntDrawR11
-      inc.b R6 ;Increment R6      
+      call      #DrawIntDrawR11
+      inc.b     R6 ;Increment R6      
 
-      jmp DrawIntOver10 ;Continue on to DrawIntOver10
+      jmp       DrawIntOver10 ;Continue on to DrawIntOver10
       
 DrawIntOver10:
-      cmp #10,R5
-      jlo DrawIntOver10Already  ;Check if we're already under 10. Otherwise...
+      cmp       #10,R5
+      jlo       DrawIntOver10Already  ;Check if we're already under 10. Otherwise...
 
-      sub.w #10,R5 ;Subtract and 
-      inc.b R11    ;keep track of how many times subtracted 1000 
-      jmp DrawIntOver10  ;until its no longer >=10
+      sub.w     #10,R5 ;Subtract and 
+      inc.b     R11    ;keep track of how many times subtracted 1000 
+      jmp       DrawIntOver10  ;until its no longer >=10
 
-      DrawIntOver10Already:
+DrawIntOver10Already:
 
       ;Draw and reset
-      call #DrawIntDrawR11
-      inc.b R6 ;Increment R6      
+      call      #DrawIntDrawR11
+      inc.b     R6 ;Increment R6      
       
       ;Jump to DrawDigit. It has a return so we'll return once we draw the last digit
-      jmp DrawDigit
+      jmp       DrawDigit
 
 
 DrawIntDrawR11:
-      push.w R5 ;Save R5
-      mov.w R11,R5 ;Move R11 to R5
-      call #DrawDigit ;Draw R11 (now in R5)
-      pop.w R5 ;Return R5
-      mov.b #0,R11 ;Reset R11 for the next subroutine.
+      push.w    R5 ;Save R5
+      mov.w     R11,R5 ;Move R11 to R5
+      call      #DrawDigit ;Draw R11 (now in R5)
+      pop.w     R5 ;Return R5
+      mov.b     #0,R11 ;Reset R11 for the next subroutine.
       ret
 
 
 
 ;Clears the LCD, then returns
 ClearLCD:
-        MOV.W   #2,&LCDCMEMCTL
-        BIS.W   #1,&LCDCCTL0
-        ret
+      MOV.W   #2,&LCDCMEMCTL
+      BIS.W   #1,&LCDCCTL0
+      ret
         
 fin:    RET
         
