@@ -98,9 +98,21 @@ nextDigitSetup:
         mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
         mov     R10,R5
         Call    #DrawInt
+        Call    #isNegative
         mov     #0,R10
         Call    #HoldResult
         jmp     Mainloop
+        
+        
+isNegative:
+        cmp     #1,R8
+        jeq    DrawNegative
+        jmp     fin
+        
+    
+DrawNegative:
+  BIS.B #0x04,&0xA2A                    ;Draw Negative
+  jmp   fin
         
         
 StartDisplay:
@@ -268,6 +280,7 @@ substraction:
         jge      swap
         sub     R9,R8
         Mov     R8,R10
+        Mov     #0,R8
         jmp     fin
         
         
@@ -280,7 +293,10 @@ swap:
         Mov     R9,R10
         Mov     R8,R9
         Mov     R10,R8
-        jmp     substraction
+        sub     R9,R8
+        Mov     R8,R10
+        Mov     #1,R8
+        jmp     fin
         
         
 mult:
