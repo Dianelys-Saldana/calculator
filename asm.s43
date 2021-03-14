@@ -83,274 +83,293 @@ nextDigitSetup:
         mov.b   #0,R15
         mov     #0,R10
         
- Mainloop:
-        Call    #ClearReg
-        Call    #StartDisplay
-        Call    #EnterInt
-        mov     R9,R8
-        Call    #nextSign
-        Call    #Delay
-        Call    #StartDisplay
-        mov     #0,R10
-        mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
-        Call    #EnterInt
-        Call    #Operate
-        Call    #ClearLCD
-        mov.b   #0,R15                    ;Clears R15 back to 0 to keep track of inputs
-        mov     R10,R5
-        Call    #DrawResult
-        Call    #isNegative
-        mov     #0,R10
-        Call    #HoldResult
-        jmp     Mainloop
+ Mainloop:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Call    #start                     ;Starts calculator which when it finishes an operation and right clicked when displaying result, it loops back to Mainloop
+        jmp     TheEnd                     ;Ends program in case of edge case
         
+        
+start:
+        Call    #ClearReg                  ;Clears registes to start gattering data and setting the fields for the calculator process
 
-DrawResult:
-        Mov     #1,R6
-        Mov     #0,R8
-        cmp     #0,R12
-        jeq     DrawInt
-        Call    #Drawing100
-        Call    #Drawing10
-        Call    #Drawing1
-        Mov     R10,R12
-        Call    #Drawing100
-        Call    #Drawing10
-        Call    #Drawing1
-        jmp     fin
+        Call    #StartDisplay              ;Displays the first segment with a 0 to start the enterInt process
+        Call    #EnterInt                  ;Receives input pertaining the first integer for the operation
+        mov     R9,R8                      ;Since the input integer is saved in R9, here we move it to R8 which is the register that will hold the first integer for the operation.
         
+        Call    #nextSign                  ;Starts the process for picking which operation will be carried out. (+,-,*,/)
+        Call    #Delay                     ;Gives some time for the data to be processed correctly
+
+        Call    #StartDisplay              ;Displays the first segment with a 0 to start the enterInt process
+        mov     #0,R10                     ;Clears R10, since this is the register supposed to hold the result values. This is done in case of an edge case. This way we avoid issues that may occur 
+        mov.b   #0,R15                     ;Clears R15 back to 0 to keep track of inputs
+        Call    #EnterInt                  ;Receives input pertaining the second integer for the operation
+
+        Call    #Operate                   ;Carries out the operation chosen with the use of the 2 integers that were provided. The result of the operation is saved on R10. R8-> first integer, R9-> second integer, R10-> Result. 
+
+        Call    #ClearLCD                  ;Clears the display to prepare for displaying the result for the operation.
+        mov.b   #0,R15                     ;Clears R15 back to 0 to keep track of inputs.
+        mov     R10,R5                     ;Moves result to R5. The program displays the values inside R5 when the draw functions are called or jmped to.
+        Call    #DrawResult                ;Draws the result of the operations on the display
+        Call    #isNegative                ;If the result was negative, this will add the negative sign to the display.
+
+        mov     #0,R10                     ;Resets R10 -> result back to 0, in preparation for the next run of the calculator.
+        Call    #HoldResult                ;Displays the result until the lunchpad is rightclicked to start the process again.
+        jmp     Mainloop                   ;When right clicked the program will jmp to Mainloop and carry out the program again
+        
+                                           ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+
+
+DrawResult:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     #1,R6                      ;Moves 1 to R6 which signals the segment in which we will be writing.
+        Mov     #0,R8                      ;R8 will be used as a counter and for said reason we move a 0 to it.
+        cmp     #0,R12                     ;R12 holds half of the result for multiplications when this exceeds 1000. This is done to be able to display results up to 999,999.
+        jeq     DrawInt                    ;If equal then the drawing on the display will be carried out normally as done with division, subtraction and sum.
+
+        Call    #Drawing100                ;If previous condition is not met, we start breaking down the result in 100, 10 and 1, displaying first the half stored in R12.
+        Call    #Drawing10
+        Call    #Drawing1
+        
+        Mov     R10,R12                    ;We move the other half of the result in R10, to R12, to carry out the previous process and display the other half.
+        Call    #Drawing100
+        Call    #Drawing10
+        Call    #Drawing1
+        
+        jmp     fin
+                                          ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
     
 Drawing100:
-        cmp     #2,R6
-        jge     DrawSecSeg100
-        cmp     #100,R12
-        jge     reduce100
-        jmp     fin
+        cmp     #2,R6                     ;Compare in which segment we are drawing at the moment.
+        jge     DrawSecSeg100             ;If we are not on the 1st segment (R6 >= 2) then we jmp to DrawSecSeg100, to avoid the program from not writing 0's when they need to be drawn.
+
+        cmp     #100,R12                  ;Compare that R12 is greater than 100.
+        jge     reduce100                 ;If R12 is greater than 100, we proceed to writing the centecimal position on the register.
+
+        jmp     fin                       ;If no condition were met we jump to the next number in the integer. In this case we would jump to the decimals, or multiples of 10.
         
-        
-DrawSecSeg100:
-        cmp     #100,R12
-        jge     reduce100
-        Mov     R8,R5
+                                          ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+
+DrawSecSeg100:                            ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #100,R12                  
+        jge     reduce100                 ;Compare if 12 is greater of equal to 100. If so, we reduce 100 from it and increase R8 by 1 in the reduce100 function.
+
+        Mov     R8,R5                     ;If the condition is not met then we move R8 to R5, to display in DrawIntDirect.
         Call    #DrawIntDirect
-        Inc     R6
-        Mov     #0,R8
+        
+        Inc     R6                        ;We increse R6 by one to point to the next segment in which we will be writing.
+        Mov     #0,R8                     ;We clear R8, since this is the counter. This way we can use it for the next positions.
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-Drawing10:
-        cmp     #10,R12
-        jge     reduce10
+Drawing10:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #10,R12                  ;Same process as with the Drawing100 function but with 10 instead.
+        jge     reduce10                
         cmp     #2,R6
         jge     Draw10
         jmp     fin
-        
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
     
-Drawing1:
-        cmp     #1,R12
+Drawing1:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #1,R12                   ;Same process as with the Drawing100 function but with 1 instead.
         jge     reduce1
         cmp     #2,R6
         jge     Draw1
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
+reduce100:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Inc     R8                       ;Since the condition to enter the function was met we, increase R8 bby one. This will keep track of the number of times we reduce the number by 100 and is the number which will be displayed.
+        sub     #100,R12                 ;Subtract 100 from the half of the result stored in R12.
+
+        cmp     #100,R12                 
+        jlo     Draw100                  ;If R12 is lower than 100 we proceed to draw the number stored in R8. Example if we had 900, we subtract 100, 9 times and this is stored in R8 which is what we want to display.
+        jmp     reduce100                ;If the number is not lower than 100, then we keep reducing until it is.
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-reduce100:
-        Inc     R8
-        sub     #100,R12
-        cmp     #100,R12
-        jlo     Draw100
-        jmp     reduce100
-        
-Draw100:
-        Mov     R8,R5
-        Call    #DrawIntDirect
-        Inc     R6
-        Mov     #0,R8
+Draw100:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     R8,R5                    ;We move R8 to R5 since we display values inside R5.
+        Call    #DrawIntDirect           ;We write what's stored in R5 to the display
+
+        Inc     R6                       ;We increase R6 by one since this points to the segment in which we want to write on next.
+        Mov     #0,R8                    ;We reset R8 (our counter) by passing it a 0, to prepare use in the next stage.
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
 
-
-reduce10:
-        Inc     R8
+reduce10:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Inc     R8                       ;Same process as with the reduce100 function but with 10 instead.
         sub     #10,R12
         cmp     #10,R12
         jlo     Draw10
         jmp     reduce10
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-Draw10:
-        Mov     R8,R5
+Draw10:                                  ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     R8,R5                    ;Same process as with the Draw100 function but with 10 instead.
         Call    #DrawIntDirect
         Inc     R6
         Mov     #0,R8
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
 
-
-reduce1:
-        Inc     R8
+reduce1:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Inc     R8                       ;Same process as with the reduce100 function but with 1 instead.
         sub     #1,R12
         cmp     #1,R12
         jlo     Draw1
         jmp     reduce1
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-Draw1:
-        Mov     R8,R5
+Draw1:                                   ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     R8,R5                    ;Same process as with the Draw100 function but with 1 instead.
         Call    #DrawIntDirect
         Inc     R6
         Mov     #0,R8
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-isNegative:
-        cmp     #1,R8
-        jeq    DrawNegative
-        jmp     fin
-        
+isNegative:                              ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #1,R9                    ;In subtraction, if the result is negative, then a 1 will be stored in R9.
+        jeq    DrawNegative              ;If the condition is met, then the result is negative and we jmp to DrawNegative.
+        jmp     fin                      
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
     
-DrawNegative:
-  BIS.B #0x04,&0xA2A                    ;Draw Negative
+DrawNegative:                            ;-----------------------------------  Jomar Santos referencing Ignacio's code  --------------------------------------------------------
+  BIS.B #0x04,&0xA2A                     ;Draw Negative
   jmp   fin
+                                         ;-----------------------------------  Jomar Santos referencing Ignacio's code  --------------------------------------------------------
         
-        
-StartDisplay:
-        Call #DrawDigit1
+StartDisplay:                            ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Call #DrawDigit1                 ;Calls funtion to write 0 on the first segment to initialize EnterInt process.
         jmp  fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-EnterInt:
-        mov.b   &P1IN,R13 
+EnterInt:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        mov.b   &P1IN,R13                ;In this whole funtion we loop and listens to when we have a left or right click. If the conditions are met, we jump to respective funtions.
 	and.b   #00000110B,R13
         cmp.b   #00000100B,R13
         jeq     nextDigit
         cmp.b   #00000010B,R13
         jeq     secondSetup
 	jmp EnterInt
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
         
-        
-nextDigit:
+nextDigit:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        INC     R5                       ;Increase R5 by one to display the next number option.
 
-        INC     R5
-        cmp     #10,R5
-        jeq     EqualTo10
-        Call    #SegDraw
+        cmp     #10,R5                   
+        jeq     EqualTo10                ;If R5 is equal to 10 we reset it to 0.
+        Call    #SegDraw                 ;We draw the number in R5, which is the next option.
 
+        Call    #Delay                   ;We delay to accurately take in the data the user wants stored.
+        Mov     #0,R13                   ;Reset R13 back to 0.
+        jmp     EnterInt                 ;jmp back to listening for left or right input.
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        
+ EqualTo10:                              ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     #0,R5                    ;Resets R5 back to 0.
+        Call    #SegDraw                 ;Displays the 0 to the launchpad.
+        Call    #Delay                   ;We delay to accuratelly take in the data the user wants to store
+        jmp     EnterInt                 ;jmp back to listening for left or right input.
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+
+ secondSetup:                            ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Call    #SaveInput               ;Stores the input the user provided.
         Call    #Delay
-        Mov     #0,R13
-        cmp     #10000,R12
-        jnz     EnterInt
-        
-        inc.b   R6
-        cmp     #7,R6             ;Loop until R6 (Pos) is 7
-        MOV.B   #0,R5
-        jnz     EnterInt
-        
-        jmp     fin
-        
-        
- EqualTo10:
-        Mov     #0,R5
-        Call    #SegDraw
-        Call    #Delay
-        jmp     EnterInt
-
-
- secondSetup:
-        Call    #SaveInput
-        Call    #Delay
-        inc     R15
+        inc     R15                      ;Increase R15 since this will keep track for the segments left to chose integers for to complete the integer.
         cmp     #3,R15
-        jeq     termine
-        Mov.w   #0,R13
-        Mov.w   #0,R5
-        Call    #SegDraw
-        jmp     EnterInt
+        jeq     termine                  ;If R15 is equal to 3 then we finished picking the integer.
+        Mov.w   #0,R13                   ;Resets R13, to listen for left and right input properly.
+        Mov.w   #0,R5                    ;Resets R5 back to 0.
+        Call    #SegDraw                 ;Displays the 0 on the launchpad.
+        jmp     EnterInt                 ;jmp back to listening for left or right input.
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-termine:
-        Mov     R10,R9
-        MOV.W   #0,R5
-        CALL    #ClearLCD
+termine:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     R10,R9                   ;Move the stored integer value to R9.
+        MOV.W   #0,R5                    ;Resets R5 to 0.
+        CALL    #ClearLCD 
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-SegDraw:
-        cmp     #0,R15
+SegDraw:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #0,R15                   ;Depending on the position stored on R15, we draw the integer on the corresponding segment from the 1st to the 3rd.
         jeq     DrawDigit1
         cmp     #1,R15
         jeq     DrawDigit2
         cmp     #2,R15
         jeq     DrawDigit3
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-SaveInput:
-        Mov     R5,R13
+SaveInput:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Mov     R5,R13                   ;This funtion saves the values inside R5 in R13, to properly save the wanted value of the user on the register.
         cmp     #0,R15
         jeq     Save1st
         cmp     #1,R15
         jeq     Save2nd
         cmp     #2,R15
         jeq     Save3rd
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-Save1st:
-        cmp     #0,R13
-        jne     still1
-        ;add     R13,R10
+Save1st:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #0,R13        
+        jne     still1                   ;If we are on the 1st segment and R13 is not 0 we jmp to still1. R13 is our counter for the number.
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
- still1:
-        add     #100,R10
-        dec     R13
+ still1:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        add     #100,R10                 ;Since we are on the 1st segment we add 100 to R10.
+        dec     R13                      ;Here we decrease our counter by 1.
         jmp     Save1st
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
- Save2nd:
-        cmp     #0,R13
+ Save2nd:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #0,R13                   ;Same as funtion Save1st but with the second segment
         jne     still2
-        ;add     R13,R10
         jmp     fin
-        
- still2:
-        add     #10,R10
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+
+ still2:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        add     #10,R10                  ;Same as funtion still1 but we add 10, since we are in the second segment which are multiples of 10.
         dec     R13
         jmp     Save2nd
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
- Save3rd:
-        cmp     #0,R13
+ Save3rd:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        cmp     #0,R13                   ;Same as funtion Save1st but with the third segment
         jne     still3
-        ;add     R13,R10
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
- still3:
-        add     #1,R10
+ still3:                                 ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        add     #1,R10                   ;Same as funtion still1 but we add 1, since we are in the third segment which are increments of one. Which I could had just used Inc instead. 
         dec     R13
         jmp     Save3rd
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-EnterSign:
-        mov.b   &P1IN,R13 
+EnterSign:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        mov.b   &P1IN,R13                ;Same as the EnterInt function but when left click cycles through the operations available (+,-,*,/) and if right clicks then it jumps to the next step.
 	and.b   #00000110B,R13
         cmp.b   #00000100B,R13
         jeq     nextSign
         cmp.b   #00000010B,R13
         jeq     fin
 	jmp     EnterSign
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
- nextSign:
+ nextSign:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         Call    #Delay
         cmp     #4,R7
-        jge     strtAgain                       ;Starts the sign cycle again after it is >=4
+        jge     strtAgain                ;If R7 is at 4 then we reset it back to 0 (+)
         call    #ClearLCD
         call    #DrawSign
-        Mov     R7,R4                           ;Saves operation identifier on R4
+        Mov     R7,R4                           
         inc.b   R7
         jmp     EnterSign
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-        
-strtAgain:
-        mov.b   #0,R7
+strtAgain:                               ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        mov.b   #0,R7                    ;Resets signs back to (+)
         jmp     nextSign
-        
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
 Operate:
         Mov     #0,R10
@@ -393,7 +412,7 @@ swap:
         Mov     R10,R8
         sub     R9,R8
         Mov     R8,R10
-        Mov     #1,R8
+        Mov     #1,R9
         jmp     fin
         
         
@@ -432,20 +451,21 @@ divi:
         jmp   divi
         
         
-HoldResult:
-        mov.b   &P1IN,R13 
+HoldResult:                              ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        mov.b   &P1IN,R13                ;Displays result until right click which starts calculator process for next operation if any.
 	and.b   #00000110B,R13
         cmp.b   #00000010B,R13
-        jeq     ClearReg         ;When right clicked resets everything for next operation
+        jeq     ClearReg                 ;When right clicked resets everything for next operation
 	jmp     HoldResult
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-ClearReg:       ;Clears register for next run
-        Call    #Delay
+ClearReg:                                ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        Call    #Delay                   ;This funtion clears register for next run
         
         mov     #0,R4
         mov     #0,R5
         
-        mov     #1,R6           ;Tells us which segment we will use and we always at the very least use the 1st
+        mov     #1,R6                    ;Tells us which segment we will use and we always at the very least use the 1st. Because this we pass a 1 to R6.
 
         mov     #0,R7
         mov     #0,R8
@@ -459,15 +479,16 @@ ClearReg:       ;Clears register for next run
         Call    #ClearLCD
         
         jmp     fin
-              
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
-Delay:
-        MOV     #50000,R13
+Delay:                                   ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
+        MOV     #50000,R13               ;This funtion passes a 50000 to R13 so that it funtions as a delay to accurately carry out the funtions of the calculator.
         
 Next:
-        dec     R13
+        dec     R13                      ;Here we loop through Next until R13 is 0.
         jnz     Next
         jmp     fin
+                                         ;----------------------------------------              Jomar Santos           ---------------------------------------------------------
         
 ;Objective: Draw an arithmetic sign (+, -, *, or /) determined by R7 (0, 1, 2, or 3) at segment 1-6 on the LCD, determined by R6
 ;Preconditions: Arithmetic sign must be on R7 (0-3), and Segment must be on R6 (1-6)
