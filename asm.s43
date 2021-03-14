@@ -469,6 +469,11 @@ Next:
         jnz     Next
         jmp     fin
         
+;Objective: Draw an arithmetic sign (+, -, *, or /) determined by R7 (0, 1, 2, or 3) at segment 1-6 on the LCD, determined by R6
+;Preconditions: Arithmetic sign must be on R7 (0-3), and Segment must be on R6 (1-6)
+;Postconditions: Arithmetic sign is drawn on the LCD. Nothing is changed.
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawSign:
         push.w  R7 ;Save R7
         push.w  R5 ;Save R5
@@ -480,7 +485,11 @@ DrawSign:
         ret ;And let's get the hell out of here.
     
 
-;Draws Int in R5 starting at position R6
+;Objective: Draws a whole int (-10000 not included to 10000 not included) to the LCD starting at position 1-6 on the LCD
+;Preconditions: Whole int must be on R5, and starting position must be on R6
+;Postconditions: Number is drawn on the LCD. Nothing is changed.
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntSafe:
 DrawInt:
        push.w   R6
@@ -502,16 +511,31 @@ DrawIntFlipR5Cont:
       jlo       DrawIntDrawNegative ;no need for a cont tag since we can use the return in DrawIntDrawNegative to return.
       ret
 
+;Objective: Convert R5 from a negative value to a positive value
+;Preconditions: value to bit invert must be on R5
+;Postconditions: R5's binary value is returned inverted, and incremented by 1. (IE 0xFFFF --> 0x0001)
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntFlipR5:
       inv       R5
       inc.w     R5
       jmp       DrawIntFlipR5Cont
   
+;Objective: Draws the negative sign on the first position
+;Preconditions: None
+;Postconditions: Negative sign is drawn.
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntDrawNegative:
       BIS.B     #0x04,&0xA2A ;Draw Negative
       ret ;return
 
-;Draws an unsigned (assume positive) integer WITHOUT ensuring that R5, R6, and R11 are preserved.
+
+;Objective: Draws an unsigned (assumed positive) integer at position R6 WITHOUT ensuring that R5, R6, and R11 are preserved. Should only be used internally by DrawInt
+;Preconditions: Integerger value must be at R5 and must be positive unsigned. Position value must be at R6 and must be 1-6
+;Postconditions: int at R5 is drawn at position R6 on the LCD. Registers may have been modified.
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntDirect:
       
       cmp.w     #7,R6
@@ -530,6 +554,13 @@ DrawIntDirect:
 
       cmp.w     #10,R5
       jge       DrawIntOver10 ;If it's over 10
+      ;Here we continue on to DrawDigit. This is intentional
+
+;Objective: Draws digit or sign in R5 (0-13) at position R6 (1-6) on the LCD. 
+;Preconditions: Value to draw must be on R5, and position must be on R6
+;Postconditions: R5's value is drawn to R6 on the LCD. Nothing is changed
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawDigit:
 
       ;Draw the specific digit
@@ -553,9 +584,13 @@ DrawDigit:
 
       ret
 
-;DrawIntSetNegative:
- ;      jmp DrawIntSetNegativeCont
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;(The following subroutines DrawDigit1 - DrawDigit6) can be described using the following comment)
+;Objectives: Draws digit or sign in R5 (0-13) at position N on the LCD (Where N represents the number at the end of DrawDigitN). 
+;Preconditions: Value to draw must be on R5
+;Postconditions: R5's value is drawn to N on the LCD. Nothing is changed
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawDigit1:
       MOV.B     #9,R11 ;Reuse R11 because why not
       MOV.B     DigitH(R5),0xA20(R11)
@@ -591,12 +626,24 @@ DrawDigit6:
       MOV.B     DigitH(R5),0xA20(R11)
       MOV.B     DigitL(R5),0xA20+1(R11)
 ret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;;;;;;;;DRAWINT SUBROUTINES;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;DRAWINT INTERNAL SUBROUTINES;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;The following subroutines are meant to be *internal* and should not be used outside of DrawInt
 
+;Objectives: Return call for values over 10000 or R6>7
+;Preconditions: (none)
+;Postconditions: Returns
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntOver10000:
       ret ;Return because we won't need to do that. ahahahaha
 
+;Objectives: Handles the process of drawing an integer over 1000.
+;Preconditions: Value to draw must be on R5 and must be at least over 1000. R11 must already be 0
+;Postconditions: R5's Thousands place is drawn to the LCD at position R6. R5's thousands place is removed, and R6 is incremented. R11's value is returned to 0 when done. Hands off process to DrawIntOver100
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntOver1000:
       sub.w     #1000,R5 ;Subtract and 
       inc.b     R11    ;keep track of how many times subtracted 1000 
@@ -610,32 +657,44 @@ DrawIntOver1000:
 
       jmp       DrawIntOver100;Continue on to DrawIntOver100
 
+;Objectives: Handles the process of drawing an integer over 100.
+;Preconditions: Value to draw must be on R5. R11 must already be 0
+;Postconditions: R5's Hundreds place is drawn to the LCD at position R6. R5's Hundreds place is removed, and R6 is incremented. R11's value is returned to 0 when done. Hands off process to DrawIntOver10
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntOver100:
       
       cmp       #100,R5
-      jlo       DrawIntOver100Already  ;Check if it's bellow 100. Otherwise, 
+      jlo       DrawIntUnder100Already  ;Check if it's bellow 100. Otherwise, 
       
       sub.w     #100,R5 ;Subtract and 
       inc.b     R11    ;keep track of how many times subtracted 100
       jmp       DrawIntOver100  ;until its no longer >=100
       
-      DrawIntOver100Already:
+      ;Internal jump point to indicate we're already under 100.
+      DrawIntUnder100Already:
       
       ;Draw and reset R11
       call      #DrawIntDrawR11
       inc.b     R6 ;Increment R6      
 
       jmp       DrawIntOver10 ;Continue on to DrawIntOver10
-      
+
+;Objectives: Handles the process of drawing an integer over 10.
+;Preconditions: Value to draw must be on R5. R11 must already be 0
+;Postconditions: R5's tens place is drawn to the LCD at position R6. R5's tens place is removed, and R6 is incremented. R11's value is returned to 0 when done. Hands off process to DrawDigit
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntOver10:
       cmp       #10,R5
-      jlo       DrawIntOver10Already  ;Check if we're already under 10. Otherwise...
+      jlo       DrawIntUnder10Already  ;Check if we're already under 10. Otherwise...
 
       sub.w     #10,R5 ;Subtract and 
       inc.b     R11    ;keep track of how many times subtracted 1000 
       jmp       DrawIntOver10  ;until its no longer >=10
 
-DrawIntOver10Already:
+;Internal jump point to indicate we're already under 10
+DrawIntUnder10Already:
 
       ;Draw and reset
       call      #DrawIntDrawR11
@@ -645,6 +704,11 @@ DrawIntOver10Already:
       jmp       DrawDigit
 
 
+;Objectives: Handles the process of drawing a digit that's in R11 and clearing R11. INTERNAL USE ONLY FOR DrawIntOver(N) SUBROUTINES.
+;Preconditions: Value to draw must be in R11 and must be between 0-9. Position to draw R11 must be on R6
+;Postconditions: R11 is drawn to position R6, and is then set to 0. R5 is preserved.
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 DrawIntDrawR11:
       push.w    R5 ;Save R5
       mov.w     R11,R5 ;Move R11 to R5
@@ -655,7 +719,11 @@ DrawIntDrawR11:
 
 
 
-;Clears the LCD, then returns
+;Objectives: Clears the LCD
+;Preconditions: LCD is already initialized
+;Postconditions: LCD is cleared
+;Author: Ignacio Tampe (igtampe)
+;Date: 3/7/2021
 ClearLCD:
       MOV.W   #2,&LCDCMEMCTL
       BIS.W   #1,&LCDCCTL0
